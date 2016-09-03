@@ -1,6 +1,10 @@
 import numpy as np
 import time
 
+from mathutils import Vector, Matrix    
+
+from sverchok.data_structure import Matrix_listing
+
 def closest_np2(xyz1, xyz2):
     x2 = np.subtract.outer(xyz2[:,0], xyz1[:,0])
     y2 = np.subtract.outer(xyz2[:,1], xyz1[:,1])
@@ -120,6 +124,7 @@ class SCA:
         """
         returns branchpoints verts as a list of positions
         and edges as index to connect the branch points
+        and leaves matrices 
         """
         verts = []
         edges = []
@@ -148,10 +153,31 @@ class SCA:
                 br[p] = br[p] + br[i]
                 if p not in process:
                     if p not in finished:
-                        process.insert(0, p)            
-        return verts, edges, ends, br
+                        process.insert(0, p)    
+                        
+        mats= []
+        for edge in edges:           
+            if ends[edge[1]]:
+                #calculate leaf directions
+                #end will always be edge[1]
+                v0 = Vector(verts[edge[0]])
+                v1 = Vector(verts[edge[1]])
+                dir1 = (v1 - v0).normalized()
+                dir2 = (dir1.cross(Vector((0.0, 0.0, 1.0)))).normalized()               
+                dir3 = -(dir1.cross(dir2)).normalized() 
+                m = Matrix.Identity(4)
+                m[0][0:3] = dir1
+                m[1][0:3] = dir2
+                m[2][0:3] = dir3
+                m[3][0:3] = v1
+                m.transpose()
+                mats.append(m)
+
+        mats_out =  Matrix_listing(mats)
+     
+        return verts, edges, ends, br, mats_out
         
-def sv_main(npoints=100 , dist=0.75, min_dist=3.0, max_dist=15.0, tip_radius=0.1, trop=[], verts_in=[], verts_start=[]):
+def sv_main(npoints=100 , dist=0.05, min_dist=0.05, max_dist=2.0, tip_radius=0.01, trop=[], verts_in=[], verts_start=[]):
 
     in_sockets = [
         ['s', 'maximum branches', npoints],
@@ -167,6 +193,7 @@ def sv_main(npoints=100 , dist=0.75, min_dist=3.0, max_dist=15.0, tip_radius=0.1
     edges_out = []
     rad_out = []
     ends_out = []
+    mats_out = []
     if not verts_start:
         verts_start = [[]]
     if not trop:
@@ -182,16 +209,15 @@ def sv_main(npoints=100 , dist=0.75, min_dist=3.0, max_dist=15.0, tip_radius=0.1
                   startpoints = verts_start[0])
 
         sca.iterate()
-        verts_out, edges_out, ends_out, br = sca.bp_verts_edges_n()
+        verts_out, edges_out, ends_out, br, mats_out = sca.bp_verts_edges_n()
         rad_out = [tip_radius*b**0.5 for b in br]
         
-    print('hello')        
-
     out_sockets = [
         ['v', 'Vertices', [verts_out]],
         ['s', 'Edges', [edges_out]],
         ['s', 'Branch radii', [rad_out]],
-        ['s', 'Ends mask', [ends_out]]
+        ['s', 'Ends mask', [ends_out]],
+        ['m', 'Leaf matrices', mats_out],
     ]
 
     return in_sockets, out_sockets
