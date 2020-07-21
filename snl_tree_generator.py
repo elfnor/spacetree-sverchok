@@ -1,18 +1,18 @@
 """
-in maximum branches s d=100 n=2
-
-    in_sockets = [
-        ['s', 'maximum branches', npoints],
-        ['s', 'branch length', dist],
-        ['s', 'minimum distance', min_dist],
-        ['s', 'maximum distance', max_dist],
-        ['s', 'tip radius', tip_radius], 
-        ['v', 'tropism', trop],
-        ['v', 'End Vertices',  verts_in],
-        ['v', 'Start Vertices', verts_start]
-    ]
-
-
+in npoints s d=100 n=2
+in dist s d=0.05 n=2
+in min_dist s d=0.05 n=2
+in max_dist s d=2.0 n=2
+in tip_radius s d=0.01 n=2
+in tropism v d=[] n=1
+in verts_in v d=[] n=1
+in verts_start v d=[] n=1
+out verts_out v 
+out edges_out s 
+out rad_out s
+out ends_out s
+out leaf_mats m
+"""
 
 import numpy as np
 import time
@@ -42,6 +42,8 @@ class SCA:
         self.tropism = np.array(TROPISM)
         self.influence = INFLUENCE if INFLUENCE > 0 else 1e16
         self.max_time = max_time
+        
+
         
         if len(startpoints) > 0:            
             self.bpalln = np.array(startpoints)
@@ -191,49 +193,30 @@ class SCA:
 
         mats_out =  Matrix_listing(mats)
      
-        return verts, edges, ends, br, mats_out
+        return [verts], [edges], [ends], br, mats_out
         
-def sv_main(npoints=100 , dist=0.05, min_dist=0.05, max_dist=2.0, tip_radius=0.01, trop=[], verts_in=[], verts_start=[]):
 
-    in_sockets = [
-        ['s', 'maximum branches', npoints],
-        ['s', 'branch length', dist],
-        ['s', 'minimum distance', min_dist],
-        ['s', 'maximum distance', max_dist],
-        ['s', 'tip radius', tip_radius], 
-        ['v', 'tropism', trop],
-        ['v', 'End Vertices',  verts_in],
-        ['v', 'Start Vertices', verts_start]
-    ]
-    verts_out = []
-    edges_out = []
-    rad_out = []
-    ends_out = []
-    mats_out = []
-    if not verts_start:
-        verts_start = [[]]
-    if not trop:
-        trop = [0., 0., 0.]    
+verts_out = []
+edges_out = []
+rad_out = []
+ends_out = []
+mats_out = []
+if not verts_start:
+    verts_start = []
+if not tropism:
+    tropism = [0., 0., 0.]    
+    
+if verts_in :
+    sca = SCA(NBP = npoints,
+                d=dist,
+                KILLDIST=min_dist,
+                INFLUENCE=max_dist, 
+                TROPISM=tropism,
+                endpoints=verts_in,
+                startpoints = verts_start)
+
+    sca.iterate()
+    verts_out, edges_out, ends_out, br, leaf_mats = sca.bp_verts_edges_n()
+    rad_out = [[tip_radius*b**0.5 for b in br]]
         
-    if verts_in :
-        sca = SCA(NBP = npoints,
-                  d=dist,
-                  KILLDIST=min_dist,
-                  INFLUENCE=max_dist, 
-                  TROPISM=trop[0],
-                  endpoints=verts_in[0],
-                  startpoints = verts_start[0])
 
-        sca.iterate()
-        verts_out, edges_out, ends_out, br, mats_out = sca.bp_verts_edges_n()
-        rad_out = [tip_radius*b**0.5 for b in br]
-        
-    out_sockets = [
-        ['v', 'Vertices', [verts_out]],
-        ['s', 'Edges', [edges_out]],
-        ['s', 'Branch radii', [rad_out]],
-        ['s', 'Ends mask', [ends_out]],
-        ['m', 'Leaf matrices', mats_out],
-    ]
-
-    return in_sockets, out_sockets
